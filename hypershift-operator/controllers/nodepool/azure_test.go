@@ -13,6 +13,188 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+func TestAzureAdditionalTags(t *testing.T) {
+
+	testCases := []struct {
+		name           string
+		hostedCluster  *hyperv1.HostedCluster
+		nodePool       *hyperv1.NodePool
+		expectedTagMap map[string]string
+	}{
+		{
+			name:           "no tags on hostedcluster or nodepool",
+			hostedCluster:  &hyperv1.HostedCluster{},
+			nodePool:       &hyperv1.NodePool{},
+			expectedTagMap: nil,
+		},
+		{
+			name: "hostecluster tags",
+			hostedCluster: &hyperv1.HostedCluster{
+				Spec: hyperv1.HostedClusterSpec{
+					Platform: hyperv1.PlatformSpec{
+						Azure: &hyperv1.AzurePlatformSpec{
+							ResourceTags: []hyperv1.AzureResourceTag{
+								{
+									Key:   "hostedcluster",
+									Value: "true",
+								},
+							},
+						},
+					},
+				},
+			},
+			nodePool: &hyperv1.NodePool{},
+			expectedTagMap: map[string]string{
+				"hostedcluster": "true",
+			},
+		},
+		{
+			name:          "nodepool tags",
+			hostedCluster: &hyperv1.HostedCluster{},
+			nodePool: &hyperv1.NodePool{
+				Spec: hyperv1.NodePoolSpec{
+					Platform: hyperv1.NodePoolPlatform{
+						Azure: &hyperv1.AzureNodePoolPlatform{
+							ResourceTags: []hyperv1.AzureResourceTag{
+								{
+									Key:   "nodepool",
+									Value: "true",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedTagMap: map[string]string{
+				"nodepool": "true",
+			},
+		},
+		{
+			name: "hostedcluster and nodepool tags",
+			hostedCluster: &hyperv1.HostedCluster{
+				Spec: hyperv1.HostedClusterSpec{
+					Platform: hyperv1.PlatformSpec{
+						Azure: &hyperv1.AzurePlatformSpec{
+							ResourceTags: []hyperv1.AzureResourceTag{
+								{
+									Key:   "hostedcluster",
+									Value: "true",
+								},
+							},
+						},
+					},
+				},
+			},
+			nodePool: &hyperv1.NodePool{
+				Spec: hyperv1.NodePoolSpec{
+					Platform: hyperv1.NodePoolPlatform{
+						Azure: &hyperv1.AzureNodePoolPlatform{
+							ResourceTags: []hyperv1.AzureResourceTag{
+								{
+									Key:   "nodepool",
+									Value: "true",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedTagMap: map[string]string{
+				"hostedcluster": "true",
+				"nodepool":      "true",
+			},
+		},
+		{
+			name: "hostedcluster and nodepool overlapping tag",
+			hostedCluster: &hyperv1.HostedCluster{
+				Spec: hyperv1.HostedClusterSpec{
+					Platform: hyperv1.PlatformSpec{
+						Azure: &hyperv1.AzurePlatformSpec{
+							ResourceTags: []hyperv1.AzureResourceTag{
+								{
+									Key:   "overlap",
+									Value: "true",
+								},
+							},
+						},
+					},
+				},
+			},
+			nodePool: &hyperv1.NodePool{
+				Spec: hyperv1.NodePoolSpec{
+					Platform: hyperv1.NodePoolPlatform{
+						Azure: &hyperv1.AzureNodePoolPlatform{
+							ResourceTags: []hyperv1.AzureResourceTag{
+								{
+									Key:   "overlap",
+									Value: "false",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedTagMap: map[string]string{
+				"overlap": "true",
+			},
+		},
+		{
+			name: "hostedcluster and nodepool overlap and individual tags",
+			hostedCluster: &hyperv1.HostedCluster{
+				Spec: hyperv1.HostedClusterSpec{
+					Platform: hyperv1.PlatformSpec{
+						Azure: &hyperv1.AzurePlatformSpec{
+							ResourceTags: []hyperv1.AzureResourceTag{
+								{
+									Key:   "hostedcluster",
+									Value: "true",
+								},
+								{
+									Key:   "overlap",
+									Value: "true",
+								},
+							},
+						},
+					},
+				},
+			},
+			nodePool: &hyperv1.NodePool{
+				Spec: hyperv1.NodePoolSpec{
+					Platform: hyperv1.NodePoolPlatform{
+						Azure: &hyperv1.AzureNodePoolPlatform{
+							ResourceTags: []hyperv1.AzureResourceTag{
+								{
+									Key:   "nodepool",
+									Value: "true",
+								},
+								{
+									Key:   "overlap",
+									Value: "false",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedTagMap: map[string]string{
+				"hostedcluster": "true",
+				"nodepool":      "true",
+				"overlap":       "true",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewGomegaWithT(t)
+
+			resultingTagMap := azureAdditionalTags(tc.hostedCluster, tc.nodePool)
+
+			g.Expect(resultingTagMap).To(Equal(tc.expectedTagMap))
+		})
+	}
+}
+
 func TestAzureMachineTemplateSpec(t *testing.T) {
 	testCases := []struct {
 		name                             string
